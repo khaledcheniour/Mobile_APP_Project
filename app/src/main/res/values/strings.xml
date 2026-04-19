@@ -1,0 +1,11 @@
+<resources>
+    <string name="app_name">Memory Map</string>
+    <string name="title_map">Map</string>
+    <string name="title_list">Memories</string>
+    <string name="add_memory">Add Memory</string>
+    <string name="note_hint">What is your memory here?</string>
+    <string name="emotion_prompt">Select an Emotion</string>
+    <string name="save_button">Save Memory</string>
+    <string name="photo_button">Attach Photo</string>
+    <string name="location_button">Pick Location</string>
+</resources>
