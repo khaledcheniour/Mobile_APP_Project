@@ -37,6 +37,17 @@
             app:layout_constraintEnd_toEndOf="parent" />
 
         <TextView
+            android:id="@+id/item_author"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="16dp"
+            android:textSize="12sp"
+            android:textColor="#AAAAAA"
+            app:layout_constraintTop_toBottomOf="@id/item_emotion"
+            app:layout_constraintStart_toEndOf="@id/item_image"
+            app:layout_constraintEnd_toEndOf="parent" />
+
+        <TextView
             android:id="@+id/item_note"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
@@ -46,7 +57,7 @@
             android:textColor="#333333"
             android:maxLines="2"
             android:ellipsize="end"
-            app:layout_constraintTop_toBottomOf="@id/item_emotion"
+            app:layout_constraintTop_toBottomOf="@id/item_author"
             app:layout_constraintStart_toEndOf="@id/item_image"
             app:layout_constraintEnd_toEndOf="parent" />
 

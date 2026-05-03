@@ -8,4 +8,16 @@
     <string name="save_button">Save Memory</string>
     <string name="photo_button">Attach Photo</string>
     <string name="location_button">Pick Location</string>
+    <string name="welcome_text">Welcome to Memory Map</string>
+    <string name="username_hint">Username</string>
+    <string name="password_hint">Password</string>
+    <string name="login_button">Login</string>
+    <string name="continue_guest_button">Continue as Guest</string>
+    <string name="title_friends">Friends</string>
+    <string name="friend_requests">Friend Requests</string>
+    <string name="add_friend">Add Friend</string>
+    <string name="friend_username_hint">Friend Username</string>
+    <string name="send">Send</string>
+    <string name="my_friends">My Friends</string>
+    <string name="logout">Logout</string>
 </resources>

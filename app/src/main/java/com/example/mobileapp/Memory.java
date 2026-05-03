@@ -11,6 +11,7 @@ public class Memory implements Serializable {
     private String emotion;
     private String imagePath;
     private long timestamp;
+    private String author;
 
     public Memory() {}
 
@@ -44,4 +45,7 @@ public class Memory implements Serializable {
 
     public long getTimestamp() { return timestamp; }
     public void setTimestamp(long timestamp) { this.timestamp = timestamp; }
+
+    public String getAuthor() { return author; }
+    public void setAuthor(String author) { this.author = author; }
 }

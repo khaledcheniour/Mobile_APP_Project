@@ -38,6 +38,7 @@ public class MemoryAdapter extends RecyclerView.Adapter<MemoryAdapter.MemoryView
         Memory memory = memories.get(position);
         holder.emotionText.setText(memory.getEmotion());
         holder.noteText.setText(memory.getNote());
+        holder.authorText.setText(memory.getAuthor() != null ? "By " + memory.getAuthor() : "");
 
         if (memory.getImagePath() != null && !memory.getImagePath().isEmpty()) {
             File imgFile = new File(memory.getImagePath());
@@ -60,12 +61,14 @@ public class MemoryAdapter extends RecyclerView.Adapter<MemoryAdapter.MemoryView
         ImageView imageView;
         TextView emotionText;
         TextView noteText;
+        TextView authorText;
 
         public MemoryViewHolder(@NonNull View itemView) {
             super(itemView);
             imageView = itemView.findViewById(R.id.item_image);
             emotionText = itemView.findViewById(R.id.item_emotion);
             noteText = itemView.findViewById(R.id.item_note);
+            authorText = itemView.findViewById(R.id.item_author);
         }
     }
 }

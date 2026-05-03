@@ -34,6 +34,8 @@ public class MainActivity extends AppCompatActivity {
                 selectedFragment = new MapFragment();
             } else if (item.getItemId() == R.id.nav_list) {
                 selectedFragment = new ListFragment();
+            } else if (item.getItemId() == R.id.nav_friends) {
+                selectedFragment = new FriendsFragment();
             }
             if (selectedFragment != null) {
                 getSupportFragmentManager().beginTransaction()

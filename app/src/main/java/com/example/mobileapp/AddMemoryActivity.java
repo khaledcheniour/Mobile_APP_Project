@@ -156,6 +156,11 @@ public class AddMemoryActivity extends AppCompatActivity {
         String emotion = spinnerEmotion.getSelectedItem().toString();
 
         Memory memory = new Memory(selectedLocation.getLatitude(), selectedLocation.getLongitude(), note, emotion, currentImagePath);
+
+        android.content.SharedPreferences prefs = getSharedPreferences("MemoryAppPrefs", MODE_PRIVATE);
+        String username = prefs.getString("current_user", "Guest");
+        memory.setAuthor(username);
+
         StorageManager.addMemory(this, memory);
         
         Toast.makeText(this, "Memory Saved!", Toast.LENGTH_SHORT).show();

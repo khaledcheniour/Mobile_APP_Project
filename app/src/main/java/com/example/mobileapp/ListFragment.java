@@ -30,11 +30,17 @@ public class ListFragment extends Fragment {
     @Override
     public void onResume() {
         super.onResume();
+        
+        android.content.SharedPreferences prefs = requireContext().getSharedPreferences("MemoryAppPrefs", android.content.Context.MODE_PRIVATE);
+        String username = prefs.getString("current_user", "Guest");
+        
+        java.util.List<Memory> memoriesToDisplay = StorageManager.getFriendsAndMyMemories(getContext(), username);
+        
         if (adapter == null) {
-            adapter = new MemoryAdapter(StorageManager.loadMemories(getContext()));
+            adapter = new MemoryAdapter(memoriesToDisplay);
             recyclerView.setAdapter(adapter);
         } else {
-            adapter.setMemories(StorageManager.loadMemories(getContext()));
+            adapter.setMemories(memoriesToDisplay);
         }
     }
 }

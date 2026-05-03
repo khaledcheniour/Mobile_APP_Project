@@ -46,7 +46,7 @@ public class MapFragment extends Fragment {
         map = view.findViewById(R.id.map_view);
         map.setMultiTouchControls(true);
         map.getController().setZoom(5.0);
-        map.getController().setCenter(new GeoPoint(48.8566, 2.3522)); // Default to Paris
+        map.getController().setCenter(new GeoPoint(48.8566, 2.3522));
 
         loadAndClusterMemories();
 
@@ -68,7 +68,11 @@ public class MapFragment extends Fragment {
     
     private void loadAndClusterMemories() {
         map.getOverlays().clear();
-        List<Memory> memories = StorageManager.loadMemories(getContext());
+        
+        android.content.SharedPreferences prefs = requireContext().getSharedPreferences("MemoryAppPrefs", android.content.Context.MODE_PRIVATE);
+        String username = prefs.getString("current_user", "Guest");
+        List<Memory> memories = StorageManager.getFriendsAndMyMemories(getContext(), username);
+        
         if (memories.isEmpty()) return;
 
         // Simple distance-based clustering algorithm
@@ -101,11 +105,13 @@ public class MapFragment extends Fragment {
             
             if (c.memories.size() == 1) {
                 Memory m = c.memories.get(0);
+                boolean isFriend = m.getAuthor() != null && !m.getAuthor().equals(username);
                 marker.setTitle(m.getEmotion());
                 marker.setSnippet(m.getNote());
-                marker.setIcon(getEmotionIcon(m.getEmotion()));
+                marker.setIcon(getEmotionIcon(m.getEmotion(), isFriend));
                 marker.setOnMarkerClickListener((mrk, mapView) -> {
-                    Toast.makeText(getContext(), m.getEmotion() + ": " + m.getNote(), Toast.LENGTH_SHORT).show();
+                    String authorTag = isFriend ? " (By " + m.getAuthor() + ")" : "";
+                    Toast.makeText(getContext(), m.getEmotion() + authorTag + ": " + m.getNote(), Toast.LENGTH_SHORT).show();
                     mrk.showInfoWindow();
                     return true;
                 });
@@ -131,7 +137,7 @@ public class MapFragment extends Fragment {
         return Math.sqrt(Math.pow(lat1 - lat2, 2) + Math.pow(lon1 - lon2, 2));
     }
     
-    private Drawable getEmotionIcon(String emotion) {
+    private Drawable getEmotionIcon(String emotion, boolean isFriend) {
         // Return colored markers based on emotion
         int color = Color.BLUE;
         if (emotion != null) {
@@ -141,6 +147,10 @@ public class MapFragment extends Fragment {
             else if (e.contains("angry")) color = Color.RED;
             else if (e.contains("peaceful")) color = Color.GREEN;
             else if (e.contains("excited")) color = Color.MAGENTA;
+        }
+        
+        if (isFriend) {
+            return createFriendMarker(color, 40);
         }
         return createSolidMarker(color, 40);
     }
@@ -158,6 +168,25 @@ public class MapFragment extends Fragment {
         stroke.setColor(Color.WHITE);
         stroke.setStyle(Paint.Style.STROKE);
         stroke.setStrokeWidth(3f);
+        stroke.setAntiAlias(true);
+        canvas.drawCircle(radius, radius, radius, stroke);
+        
+        return new BitmapDrawable(getResources(), bitmap);
+    }
+    
+    private Drawable createFriendMarker(int color, int radius) {
+        Bitmap bitmap = Bitmap.createBitmap(radius * 2, radius * 2, Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(bitmap);
+        Paint paint = new Paint();
+        paint.setColor(color);
+        paint.setStyle(Paint.Style.FILL);
+        paint.setAntiAlias(true);
+        canvas.drawCircle(radius, radius, radius, paint);
+        
+        Paint stroke = new Paint();
+        stroke.setColor(Color.GREEN);
+        stroke.setStyle(Paint.Style.STROKE);
+        stroke.setStrokeWidth(12f);
         stroke.setAntiAlias(true);
         canvas.drawCircle(radius, radius, radius, stroke);
         
