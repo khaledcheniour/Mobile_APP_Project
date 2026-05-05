@@ -119,6 +119,17 @@ public class StorageManager {
         }
     }
 
+    /**
+     * Returns the list of accepted friend usernames for the given user.
+     * Returns an empty list for Guest accounts.
+     */
+    public static List<String> getFriendsList(Context context, String username) {
+        if (username == null || username.equals("Guest")) return new ArrayList<>();
+        User user = getUser(context, username);
+        if (user == null) return new ArrayList<>();
+        return new ArrayList<>(user.getFriends());
+    }
+
     public static List<Memory> getFriendsAndMyMemories(Context context, String username) {
         List<Memory> allMemories = loadMemories(context);
         if (username == null || username.equals("Guest")) return allMemories;

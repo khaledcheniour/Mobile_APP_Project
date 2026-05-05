@@ -1,6 +1,7 @@
 package com.example.mobileapp;
 
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
@@ -11,12 +12,18 @@ import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.core.content.ContextCompat;
+import androidx.core.view.GravityCompat;
+import androidx.drawerlayout.widget.DrawerLayout;
 import androidx.fragment.app.Fragment;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
+
+import com.google.android.material.floatingactionbutton.FloatingActionButton;
 
 import org.osmdroid.config.Configuration;
 import org.osmdroid.util.GeoPoint;
@@ -25,39 +32,86 @@ import org.osmdroid.views.overlay.Marker;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 public class MapFragment extends Fragment {
 
     private MapView map;
+    private DrawerLayout drawerLayout;
+    private SidebarFriendsAdapter friendsAdapter;
+
+    private String currentUsername;
+    private List<Memory> allMemories = new ArrayList<>();
+    private Set<String> selectedFriends = new HashSet<>();
+
+    private static final String PREFS    = "MemoryAppPrefs";
+    private static final String KEY_USER = "current_user";
+    private static final String KEY_SEL  = "sidebar_selected_friends";
 
     public MapFragment() {}
 
     @Nullable
     @Override
-    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
-        
-        // Setup OSMDroid configuration
+    public View onCreateView(@NonNull LayoutInflater inflater,
+                             @Nullable ViewGroup container,
+                             @Nullable Bundle savedInstanceState) {
+
         Context ctx = requireActivity().getApplicationContext();
-        Configuration.getInstance().load(ctx, androidx.preference.PreferenceManager.getDefaultSharedPreferences(ctx));
+        Configuration.getInstance().load(
+                ctx, androidx.preference.PreferenceManager.getDefaultSharedPreferences(ctx));
 
         View view = inflater.inflate(R.layout.fragment_map, container, false);
+
+        // Map
         map = view.findViewById(R.id.map_view);
         map.setMultiTouchControls(true);
         map.getController().setZoom(5.0);
         map.getController().setCenter(new GeoPoint(48.8566, 2.3522));
 
-        loadAndClusterMemories();
+        // Drawer
+        drawerLayout = view.findViewById(R.id.drawer_layout);
+        FloatingActionButton fabOpen = view.findViewById(R.id.fab_open_sidebar);
+        fabOpen.setOnClickListener(v -> drawerLayout.openDrawer(GravityCompat.START));
+        TextView btnClose = view.findViewById(R.id.btn_close_sidebar);
+        btnClose.setOnClickListener(v -> drawerLayout.closeDrawer(GravityCompat.START));
 
+        // Current user
+        SharedPreferences prefs = requireContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        currentUsername = prefs.getString(KEY_USER, "Guest");
+
+        // Load data
+        loadData();
+
+        // Friends RecyclerView
+        RecyclerView friendsRv = view.findViewById(R.id.friends_recycler);
+        friendsRv.setLayoutManager(new LinearLayoutManager(requireContext()));
+
+        List<String> friends = StorageManager.getFriendsList(requireContext(), currentUsername);
+        selectedFriends = restoreStringSet(prefs, KEY_SEL, new HashSet<>(friends));
+        selectedFriends.add(currentUsername);
+
+        friendsAdapter = new SidebarFriendsAdapter(friends, selectedFriends, sel -> {
+            selectedFriends = sel;
+            selectedFriends.add(currentUsername);
+            persistStringSet(KEY_SEL, selectedFriends);
+            refreshMap();
+        });
+        friendsRv.setAdapter(friendsAdapter);
+
+        refreshMap();
         return view;
     }
-    
+
     @Override
     public void onResume() {
         super.onResume();
         map.onResume();
-        loadAndClusterMemories();
+        loadData();
+        if (friendsAdapter != null) friendsAdapter.notifyDataSetChanged();
+        refreshMap();
     }
 
     @Override
@@ -65,35 +119,46 @@ public class MapFragment extends Fragment {
         super.onPause();
         map.onPause();
     }
-    
-    private void loadAndClusterMemories() {
+
+    private void loadData() {
+        allMemories = StorageManager.getFriendsAndMyMemories(requireContext(), currentUsername);
+    }
+
+    /**
+     * Only show memories whose author is the current user or a checked friend.
+     */
+    private void refreshMap() {
         map.getOverlays().clear();
-        
-        android.content.SharedPreferences prefs = requireContext().getSharedPreferences("MemoryAppPrefs", android.content.Context.MODE_PRIVATE);
-        String username = prefs.getString("current_user", "Guest");
-        List<Memory> memories = StorageManager.getFriendsAndMyMemories(getContext(), username);
-        
-        if (memories.isEmpty()) return;
 
-        // Simple distance-based clustering algorithm
+        List<Memory> filtered = new ArrayList<>();
+        for (Memory m : allMemories) {
+            String author = m.getAuthor();
+            boolean visible = (author == null)
+                    || author.equals(currentUsername)
+                    || selectedFriends.contains(author);
+            if (visible) filtered.add(m);
+        }
+
+        if (filtered.isEmpty()) { map.invalidate(); return; }
+
+        // Cluster
         List<Cluster> clusters = new ArrayList<>();
-        double CLUSTER_THRESHOLD = 0.5; // Roughly 50km threshold
-
-        for (Memory m : memories) {
-            boolean addedToCluster = false;
+        double THRESHOLD = 0.5;
+        for (Memory m : filtered) {
+            boolean added = false;
             for (Cluster c : clusters) {
-                if (distance(c.centerLat, c.centerLng, m.getLatitude(), m.getLongitude()) < CLUSTER_THRESHOLD) {
+                if (distance(c.centerLat, c.centerLng, m.getLatitude(), m.getLongitude()) < THRESHOLD) {
                     c.memories.add(m);
-                    addedToCluster = true;
+                    added = true;
                     break;
                 }
             }
-            if (!addedToCluster) {
-                Cluster newCluster = new Cluster();
-                newCluster.centerLat = m.getLatitude();
-                newCluster.centerLng = m.getLongitude();
-                newCluster.memories.add(m);
-                clusters.add(newCluster);
+            if (!added) {
+                Cluster nc = new Cluster();
+                nc.centerLat = m.getLatitude();
+                nc.centerLng = m.getLongitude();
+                nc.memories.add(m);
+                clusters.add(nc);
             }
         }
 
@@ -102,16 +167,16 @@ public class MapFragment extends Fragment {
             Marker marker = new Marker(map);
             marker.setPosition(gp);
             marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM);
-            
+
             if (c.memories.size() == 1) {
                 Memory m = c.memories.get(0);
-                boolean isFriend = m.getAuthor() != null && !m.getAuthor().equals(username);
+                boolean isFriend = m.getAuthor() != null && !m.getAuthor().equals(currentUsername);
                 marker.setTitle(m.getEmotion());
                 marker.setSnippet(m.getNote());
                 marker.setIcon(getEmotionIcon(m.getEmotion(), isFriend));
                 marker.setOnMarkerClickListener((mrk, mapView) -> {
-                    String authorTag = isFriend ? " (By " + m.getAuthor() + ")" : "";
-                    Toast.makeText(getContext(), m.getEmotion() + authorTag + ": " + m.getNote(), Toast.LENGTH_SHORT).show();
+                    String tag = isFriend ? " (by " + m.getAuthor() + ")" : "";
+                    Toast.makeText(getContext(), m.getEmotion() + tag + ": " + m.getNote(), Toast.LENGTH_SHORT).show();
                     mrk.showInfoWindow();
                     return true;
                 });
@@ -125,115 +190,96 @@ public class MapFragment extends Fragment {
             }
             map.getOverlays().add(marker);
         }
-        
-        // Center on last memory
-        if (!memories.isEmpty()) {
-            map.getController().setCenter(new GeoPoint(memories.get(memories.size() - 1).getLatitude(), memories.get(memories.size() - 1).getLongitude()));
-        }
+
+        Memory last = filtered.get(filtered.size() - 1);
+        map.getController().setCenter(new GeoPoint(last.getLatitude(), last.getLongitude()));
         map.invalidate();
     }
-    
+
+    // ── Persistence ────────────────────────────────────────────────────────
+    private void persistStringSet(String key, Set<String> set) {
+        requireContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .edit().putString(key, String.join(",", set)).apply();
+    }
+
+    private Set<String> restoreStringSet(SharedPreferences prefs, String key, Set<String> fallback) {
+        String raw = prefs.getString(key, null);
+        if (raw == null || raw.isEmpty()) return fallback;
+        Set<String> result = new HashSet<>();
+        for (String s : raw.split(",")) if (!s.isEmpty()) result.add(s);
+        return result;
+    }
+
+    // ── Drawing helpers ────────────────────────────────────────────────────
     private double distance(double lat1, double lon1, double lat2, double lon2) {
         return Math.sqrt(Math.pow(lat1 - lat2, 2) + Math.pow(lon1 - lon2, 2));
     }
-    
+
     private Drawable getEmotionIcon(String emotion, boolean isFriend) {
-        // Return colored markers based on emotion
-        int color = Color.BLUE;
+        int color = Color.parseColor("#5C6BC0");
         if (emotion != null) {
             String e = emotion.toLowerCase();
-            if (e.contains("happy") || e.contains("joy")) color = Color.YELLOW;
-            else if (e.contains("sad")) color = Color.BLUE;
-            else if (e.contains("angry")) color = Color.RED;
-            else if (e.contains("peaceful")) color = Color.GREEN;
-            else if (e.contains("excited")) color = Color.MAGENTA;
+            if (e.contains("happy") || e.contains("joy"))   color = Color.parseColor("#FDD835");
+            else if (e.contains("sad"))                     color = Color.parseColor("#42A5F5");
+            else if (e.contains("angry"))                   color = Color.parseColor("#EF5350");
+            else if (e.contains("peaceful"))                color = Color.parseColor("#66BB6A");
+            else if (e.contains("excited"))                 color = Color.parseColor("#AB47BC");
+            else if (e.contains("nostalgic"))               color = Color.parseColor("#FF7043");
+            else if (e.contains("love"))                    color = Color.parseColor("#EC407A");
         }
-        
-        if (isFriend) {
-            return createFriendMarker(color, 40);
-        }
-        return createSolidMarker(color, 40);
+        return isFriend ? createFriendMarker(color, 40) : createSolidMarker(color, 40);
     }
 
     private Drawable createSolidMarker(int color, int radius) {
-        Bitmap bitmap = Bitmap.createBitmap(radius * 2, radius * 2, Bitmap.Config.ARGB_8888);
-        Canvas canvas = new Canvas(bitmap);
-        Paint paint = new Paint();
-        paint.setColor(color);
-        paint.setStyle(Paint.Style.FILL);
-        paint.setAntiAlias(true);
-        canvas.drawCircle(radius, radius, radius, paint);
-        
-        Paint stroke = new Paint();
-        stroke.setColor(Color.WHITE);
-        stroke.setStyle(Paint.Style.STROKE);
-        stroke.setStrokeWidth(3f);
-        stroke.setAntiAlias(true);
-        canvas.drawCircle(radius, radius, radius, stroke);
-        
-        return new BitmapDrawable(getResources(), bitmap);
+        Bitmap bmp = Bitmap.createBitmap(radius * 2, radius * 2, Bitmap.Config.ARGB_8888);
+        Canvas cv = new Canvas(bmp);
+        Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG);
+        fill.setColor(color); fill.setStyle(Paint.Style.FILL);
+        cv.drawCircle(radius, radius, radius, fill);
+        Paint stroke = new Paint(Paint.ANTI_ALIAS_FLAG);
+        stroke.setColor(Color.WHITE); stroke.setStyle(Paint.Style.STROKE); stroke.setStrokeWidth(3f);
+        cv.drawCircle(radius, radius, radius - 2, stroke);
+        return new BitmapDrawable(getResources(), bmp);
     }
-    
+
     private Drawable createFriendMarker(int color, int radius) {
-        Bitmap bitmap = Bitmap.createBitmap(radius * 2, radius * 2, Bitmap.Config.ARGB_8888);
-        Canvas canvas = new Canvas(bitmap);
-        Paint paint = new Paint();
-        paint.setColor(color);
-        paint.setStyle(Paint.Style.FILL);
-        paint.setAntiAlias(true);
-        canvas.drawCircle(radius, radius, radius, paint);
-        
-        Paint stroke = new Paint();
-        stroke.setColor(Color.GREEN);
-        stroke.setStyle(Paint.Style.STROKE);
-        stroke.setStrokeWidth(12f);
-        stroke.setAntiAlias(true);
-        canvas.drawCircle(radius, radius, radius, stroke);
-        
-        return new BitmapDrawable(getResources(), bitmap);
+        Bitmap bmp = Bitmap.createBitmap(radius * 2, radius * 2, Bitmap.Config.ARGB_8888);
+        Canvas cv = new Canvas(bmp);
+        Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG);
+        fill.setColor(color); fill.setStyle(Paint.Style.FILL);
+        cv.drawCircle(radius, radius, radius, fill);
+        Paint ring = new Paint(Paint.ANTI_ALIAS_FLAG);
+        ring.setColor(Color.parseColor("#7C83FD")); ring.setStyle(Paint.Style.STROKE); ring.setStrokeWidth(10f);
+        cv.drawCircle(radius, radius, radius - 5, ring);
+        return new BitmapDrawable(getResources(), bmp);
     }
-    
+
     private Drawable createClusterIcon(Cluster cluster) {
         int radius = 50;
-        Bitmap bitmap = Bitmap.createBitmap(radius * 2, radius * 2, Bitmap.Config.ARGB_8888);
-        Canvas canvas = new Canvas(bitmap);
-        Paint paint = new Paint();
-        paint.setColor(Color.parseColor("#80000000")); // semi-transparent black
-        paint.setStyle(Paint.Style.FILL);
-        paint.setAntiAlias(true);
-        canvas.drawCircle(radius, radius, radius, paint);
+        Bitmap bmp = Bitmap.createBitmap(radius * 2, radius * 2, Bitmap.Config.ARGB_8888);
+        Canvas cv = new Canvas(bmp);
+        Paint bg = new Paint(Paint.ANTI_ALIAS_FLAG);
+        bg.setColor(Color.parseColor("#CC3F51B5")); bg.setStyle(Paint.Style.FILL);
+        cv.drawCircle(radius, radius, radius, bg);
 
-        Paint textPaint = new Paint();
-        textPaint.setColor(Color.WHITE);
-        textPaint.setTextSize(40f);
-        textPaint.setTextAlign(Paint.Align.CENTER);
-        textPaint.setAntiAlias(true);
-        
-        // Sum emotions
-        Map<String, Integer> emotionCounts = new HashMap<>();
-        for (Memory m : cluster.memories) {
-            emotionCounts.put(m.getEmotion(), emotionCounts.getOrDefault(m.getEmotion(), 0) + 1);
-        }
-        String dominant = "Mixed";
-        int max = 0;
-        for (Map.Entry<String, Integer> e : emotionCounts.entrySet()) {
-            if (e.getValue() > max) {
-                max = e.getValue();
-                dominant = e.getKey();
-            }
-        }
-        
-        canvas.drawText(String.valueOf(cluster.memories.size()), radius, radius - 5, textPaint);
-        
-        textPaint.setTextSize(20f);
-        canvas.drawText(dominant, radius, radius + 20, textPaint);
+        Map<String, Integer> counts = new HashMap<>();
+        for (Memory m : cluster.memories)
+            counts.put(m.getEmotion(), counts.getOrDefault(m.getEmotion(), 0) + 1);
+        String dominant = "Mixed"; int max = 0;
+        for (Map.Entry<String, Integer> e : counts.entrySet())
+            if (e.getValue() > max) { max = e.getValue(); dominant = e.getKey(); }
 
-        return new BitmapDrawable(getResources(), bitmap);
+        Paint txt = new Paint(Paint.ANTI_ALIAS_FLAG);
+        txt.setColor(Color.WHITE); txt.setTextAlign(Paint.Align.CENTER);
+        txt.setTextSize(40f);
+        cv.drawText(String.valueOf(cluster.memories.size()), radius, radius + 14, txt);
+        txt.setTextSize(18f);
+        cv.drawText(dominant != null ? dominant : "Mixed", radius, radius + 34, txt);
+        return new BitmapDrawable(getResources(), bmp);
     }
 
     private static class Cluster {
-        double centerLat;
-        double centerLng;
+        double centerLat, centerLng;
         List<Memory> memories = new ArrayList<>();
     }
 }
