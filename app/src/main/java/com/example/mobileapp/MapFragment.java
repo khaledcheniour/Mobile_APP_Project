@@ -6,6 +6,8 @@ import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
+import android.graphics.PorterDuff;
+import android.graphics.PorterDuffXfermode;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
 import android.os.Bundle;
@@ -40,24 +42,15 @@ import java.util.Set;
 public class MapFragment extends Fragment {
 
     private MapView map;
-    private DrawerLayout drawerLayout;
-    private SidebarFriendsAdapter friendsAdapter;
 
-    private String currentUsername;
-    private List<Memory> allMemories = new ArrayList<>();
-    private Set<String> selectedFriends = new HashSet<>();
-
-    private static final String PREFS    = "MemoryAppPrefs";
-    private static final String KEY_USER = "current_user";
-    private static final String KEY_SEL  = "sidebar_selected_friends";
-
-    public MapFragment() {}
+    public MapFragment() {
+    }
 
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater,
-                             @Nullable ViewGroup container,
-                             @Nullable Bundle savedInstanceState) {
+            @Nullable ViewGroup container,
+            @Nullable Bundle savedInstanceState) {
 
         Context ctx = requireActivity().getApplicationContext();
         Configuration.getInstance().load(
@@ -109,9 +102,7 @@ public class MapFragment extends Fragment {
     public void onResume() {
         super.onResume();
         map.onResume();
-        loadData();
-        if (friendsAdapter != null) friendsAdapter.notifyDataSetChanged();
-        refreshMap();
+        loadAndClusterMemories();
     }
 
     @Override
@@ -130,18 +121,15 @@ public class MapFragment extends Fragment {
     private void refreshMap() {
         map.getOverlays().clear();
 
-        List<Memory> filtered = new ArrayList<>();
-        for (Memory m : allMemories) {
-            String author = m.getAuthor();
-            boolean visible = (author == null)
-                    || author.equals(currentUsername)
-                    || selectedFriends.contains(author);
-            if (visible) filtered.add(m);
-        }
+        android.content.SharedPreferences prefs = requireContext().getSharedPreferences("MemoryAppPrefs",
+                android.content.Context.MODE_PRIVATE);
+        String username = prefs.getString("current_user", "Guest");
+        List<Memory> memories = StorageManager.getFriendsAndMyMemories(getContext(), username);
 
-        if (filtered.isEmpty()) { map.invalidate(); return; }
+        if (memories.isEmpty())
+            return;
 
-        // Cluster
+        // Simple distance-based clustering algorithm
         List<Cluster> clusters = new ArrayList<>();
         double THRESHOLD = 0.5;
         for (Memory m : filtered) {
@@ -173,10 +161,21 @@ public class MapFragment extends Fragment {
                 boolean isFriend = m.getAuthor() != null && !m.getAuthor().equals(currentUsername);
                 marker.setTitle(m.getEmotion());
                 marker.setSnippet(m.getNote());
-                marker.setIcon(getEmotionIcon(m.getEmotion(), isFriend));
+
+                // Own memory → logged-in user's avatar
+                // Friend memory→ that friend's avatar (initials fallback)
+                if (!isFriend && userAvatarBitmap != null) {
+                    marker.setIcon(createAvatarMarker(userAvatarBitmap, 44));
+                } else if (isFriend) {
+                    Bitmap friendBmp = getFriendAvatarBitmap(m.getAuthor());
+                    marker.setIcon(createAvatarMarker(friendBmp, 44));
+                } else {
+                    marker.setIcon(getEmotionIcon(m.getEmotion(), false));
+                }
                 marker.setOnMarkerClickListener((mrk, mapView) -> {
-                    String tag = isFriend ? " (by " + m.getAuthor() + ")" : "";
-                    Toast.makeText(getContext(), m.getEmotion() + tag + ": " + m.getNote(), Toast.LENGTH_SHORT).show();
+                    String authorTag = isFriend ? " (By " + m.getAuthor() + ")" : "";
+                    Toast.makeText(getContext(), m.getEmotion() + authorTag + ": " + m.getNote(), Toast.LENGTH_SHORT)
+                            .show();
                     mrk.showInfoWindow();
                     return true;
                 });
@@ -184,7 +183,8 @@ public class MapFragment extends Fragment {
                 marker.setTitle(c.memories.size() + " Memories");
                 marker.setIcon(createClusterIcon(c));
                 marker.setOnMarkerClickListener((mrk, mapView) -> {
-                    Toast.makeText(getContext(), "Cluster of " + c.memories.size() + " memories", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(getContext(), "Cluster of " + c.memories.size() + " memories", Toast.LENGTH_SHORT)
+                            .show();
                     return true;
                 });
             }
@@ -204,9 +204,12 @@ public class MapFragment extends Fragment {
 
     private Set<String> restoreStringSet(SharedPreferences prefs, String key, Set<String> fallback) {
         String raw = prefs.getString(key, null);
-        if (raw == null || raw.isEmpty()) return fallback;
+        if (raw == null || raw.isEmpty())
+            return fallback;
         Set<String> result = new HashSet<>();
-        for (String s : raw.split(",")) if (!s.isEmpty()) result.add(s);
+        for (String s : raw.split(","))
+            if (!s.isEmpty())
+                result.add(s);
         return result;
     }
 
@@ -219,13 +222,20 @@ public class MapFragment extends Fragment {
         int color = Color.parseColor("#5C6BC0");
         if (emotion != null) {
             String e = emotion.toLowerCase();
-            if (e.contains("happy") || e.contains("joy"))   color = Color.parseColor("#FDD835");
-            else if (e.contains("sad"))                     color = Color.parseColor("#42A5F5");
-            else if (e.contains("angry"))                   color = Color.parseColor("#EF5350");
-            else if (e.contains("peaceful"))                color = Color.parseColor("#66BB6A");
-            else if (e.contains("excited"))                 color = Color.parseColor("#AB47BC");
-            else if (e.contains("nostalgic"))               color = Color.parseColor("#FF7043");
-            else if (e.contains("love"))                    color = Color.parseColor("#EC407A");
+            if (e.contains("happy") || e.contains("joy"))
+                color = Color.parseColor("#FDD835");
+            else if (e.contains("sad"))
+                color = Color.parseColor("#42A5F5");
+            else if (e.contains("angry"))
+                color = Color.parseColor("#EF5350");
+            else if (e.contains("peaceful"))
+                color = Color.parseColor("#66BB6A");
+            else if (e.contains("excited"))
+                color = Color.parseColor("#AB47BC");
+            else if (e.contains("nostalgic"))
+                color = Color.parseColor("#FF7043");
+            else if (e.contains("love"))
+                color = Color.parseColor("#EC407A");
         }
         return isFriend ? createFriendMarker(color, 40) : createSolidMarker(color, 40);
     }
@@ -234,10 +244,13 @@ public class MapFragment extends Fragment {
         Bitmap bmp = Bitmap.createBitmap(radius * 2, radius * 2, Bitmap.Config.ARGB_8888);
         Canvas cv = new Canvas(bmp);
         Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG);
-        fill.setColor(color); fill.setStyle(Paint.Style.FILL);
+        fill.setColor(color);
+        fill.setStyle(Paint.Style.FILL);
         cv.drawCircle(radius, radius, radius, fill);
         Paint stroke = new Paint(Paint.ANTI_ALIAS_FLAG);
-        stroke.setColor(Color.WHITE); stroke.setStyle(Paint.Style.STROKE); stroke.setStrokeWidth(3f);
+        stroke.setColor(Color.WHITE);
+        stroke.setStyle(Paint.Style.STROKE);
+        stroke.setStrokeWidth(3f);
         cv.drawCircle(radius, radius, radius - 2, stroke);
         return new BitmapDrawable(getResources(), bmp);
     }
@@ -246,10 +259,13 @@ public class MapFragment extends Fragment {
         Bitmap bmp = Bitmap.createBitmap(radius * 2, radius * 2, Bitmap.Config.ARGB_8888);
         Canvas cv = new Canvas(bmp);
         Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG);
-        fill.setColor(color); fill.setStyle(Paint.Style.FILL);
+        fill.setColor(color);
+        fill.setStyle(Paint.Style.FILL);
         cv.drawCircle(radius, radius, radius, fill);
         Paint ring = new Paint(Paint.ANTI_ALIAS_FLAG);
-        ring.setColor(Color.parseColor("#7C83FD")); ring.setStyle(Paint.Style.STROKE); ring.setStrokeWidth(10f);
+        ring.setColor(Color.parseColor("#7C83FD"));
+        ring.setStyle(Paint.Style.STROKE);
+        ring.setStrokeWidth(10f);
         cv.drawCircle(radius, radius, radius - 5, ring);
         return new BitmapDrawable(getResources(), bmp);
     }
@@ -259,23 +275,88 @@ public class MapFragment extends Fragment {
         Bitmap bmp = Bitmap.createBitmap(radius * 2, radius * 2, Bitmap.Config.ARGB_8888);
         Canvas cv = new Canvas(bmp);
         Paint bg = new Paint(Paint.ANTI_ALIAS_FLAG);
-        bg.setColor(Color.parseColor("#CC3F51B5")); bg.setStyle(Paint.Style.FILL);
+        bg.setColor(Color.parseColor("#CC3F51B5"));
+        bg.setStyle(Paint.Style.FILL);
         cv.drawCircle(radius, radius, radius, bg);
 
         Map<String, Integer> counts = new HashMap<>();
         for (Memory m : cluster.memories)
             counts.put(m.getEmotion(), counts.getOrDefault(m.getEmotion(), 0) + 1);
-        String dominant = "Mixed"; int max = 0;
+        String dominant = "Mixed";
+        int max = 0;
         for (Map.Entry<String, Integer> e : counts.entrySet())
-            if (e.getValue() > max) { max = e.getValue(); dominant = e.getKey(); }
+            if (e.getValue() > max) {
+                max = e.getValue();
+                dominant = e.getKey();
+            }
 
         Paint txt = new Paint(Paint.ANTI_ALIAS_FLAG);
-        txt.setColor(Color.WHITE); txt.setTextAlign(Paint.Align.CENTER);
+        txt.setColor(Color.WHITE);
+        txt.setTextAlign(Paint.Align.CENTER);
         txt.setTextSize(40f);
         cv.drawText(String.valueOf(cluster.memories.size()), radius, radius + 14, txt);
         txt.setTextSize(18f);
         cv.drawText(dominant != null ? dominant : "Mixed", radius, radius + 34, txt);
         return new BitmapDrawable(getResources(), bmp);
+    }
+
+    /**
+     * Creates a circular map marker from a Bitmap.
+     * Uses PorterDuff SRC_IN to clip the scaled image to a circle,
+     * then draws a white border ring around it.
+     */
+    private Drawable createAvatarMarker(Bitmap source, int radius) {
+        int size = radius * 2;
+        // Scale source to fit
+        Bitmap scaled = Bitmap.createScaledBitmap(source, size, size, true);
+
+        Bitmap output = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(output);
+
+        // Draw circle mask
+        Paint maskPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        canvas.drawCircle(radius, radius, radius, maskPaint);
+
+        // Clip source bitmap to circle
+        maskPaint.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.SRC_IN));
+        canvas.drawBitmap(scaled, 0, 0, maskPaint);
+
+        // White border
+        Paint border = new Paint(Paint.ANTI_ALIAS_FLAG);
+        border.setColor(Color.WHITE);
+        border.setStyle(Paint.Style.STROKE);
+        border.setStrokeWidth(5f);
+        canvas.drawCircle(radius, radius, radius - 3f, border);
+
+        return new BitmapDrawable(getResources(), output);
+    }
+
+    /**
+     * Returns the avatar bitmap for a given author username.
+     * Checks friendAvatarCache first. On miss, loads from StorageManager
+     * (or generates initials) and caches the result.
+     */
+    private Bitmap getFriendAvatarBitmap(String author) {
+        if (author == null)
+            return AvatarUtils.decodeAvatar(
+                    AvatarUtils.generateInitialsAvatar("?"));
+
+        if (friendAvatarCache.containsKey(author)) {
+            return friendAvatarCache.get(author);
+        }
+
+        Bitmap bmp;
+        User friend = StorageManager.findUserByUsername(getContext(), author);
+        if (friend != null && friend.getAvatar() != null
+                && friend.getAvatar().value != null
+                && !friend.getAvatar().value.isEmpty()) {
+            bmp = AvatarUtils.decodeAvatar(friend.getAvatar().value);
+        } else {
+            // Friend not registered locally yet — generate initials avatar
+            bmp = AvatarUtils.decodeAvatar(AvatarUtils.generateInitialsAvatar(author));
+        }
+        friendAvatarCache.put(author, bmp);
+        return bmp;
     }
 
     private static class Cluster {

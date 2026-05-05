@@ -1,4 +1,5 @@
 <resources>
+    <!-- ── Existing strings (untouched) ── -->
     <string name="app_name">Memory Map</string>
     <string name="title_map">Map</string>
     <string name="title_list">Memories</string>
@@ -11,7 +12,7 @@
     <string name="welcome_text">Welcome to Memory Map</string>
     <string name="username_hint">Username</string>
     <string name="password_hint">Password</string>
-    <string name="login_button">Login</string>
+    <string name="login_button">Sign In</string>
     <string name="continue_guest_button">Continue as Guest</string>
     <string name="title_friends">Friends</string>
     <string name="friend_requests">Friend Requests</string>
@@ -20,4 +21,50 @@
     <string name="send">Send</string>
     <string name="my_friends">My Friends</string>
     <string name="logout">Logout</string>
+
+    <!-- ── Login screen additions ── -->
+    <string name="login_subtitle">Sign in to your account</string>
+    <string name="or">OR</string>
+    <string name="no_account">Don\'t have an account?</string>
+    <string name="register_link">Register</string>
+
+    <!-- ── Register screen ── -->
+    <string name="create_account">Create Account</string>
+    <string name="register_subtitle">Join Memory Map today</string>
+    <string name="confirm_password_hint">Confirm Password</string>
+    <string name="password_helper">Minimum 6 characters</string>
+    <string name="register_button">Create Account</string>
+    <string name="avatar_hint">Tap to upload a profile picture (optional)</string>
+    <string name="avatar_preview">Avatar preview</string>
+    <string name="pick_image">Pick image</string>
+    <string name="have_account">Already have an account?</string>
+    <string name="login_link">Sign In</string>
+    <string name="back">Back</string>
+    <string name="register_success">Welcome, %1$s! Your account is ready.</string>
+
+    <!-- ── Validation errors ── -->
+    <string name="error_username_required">Username is required</string>
+    <string name="error_username_short">Username must be at least 3 characters</string>
+    <string name="error_username_taken">This username is already taken</string>
+    <string name="error_password_required">Password is required</string>
+    <string name="error_password_short">Password must be at least 6 characters</string>
+    <string name="error_confirm_required">Please confirm your password</string>
+    <string name="error_passwords_no_match">Passwords do not match</string>
+    <string name="error_invalid_credentials">Incorrect username or password</string>
+    <string name="error_register_failed">Registration failed. Please try again.</string>
+    <string name="error_image_load">Could not load the selected image</string>
+
+    <!-- ── Profile menu ── -->
+    <string name="profile">Profile</string>
+    <string name="change_username">Change Username</string>
+    <string name="change_password">Change Password</string>
+    <string name="change_picture">Change Profile Picture</string>
+    <string name="new_username_hint">New username</string>
+    <string name="current_password_hint">Current password</string>
+    <string name="new_password_hint">New password</string>
+    <string name="username_updated">Username updated successfully</string>
+    <string name="password_updated">Password updated successfully</string>
+    <string name="avatar_updated">Profile picture updated</string>
+    <string name="error_wrong_password">Current password is incorrect</string>
+    <string name="error_username_same">New username is the same as the current one</string>
 </resources>
