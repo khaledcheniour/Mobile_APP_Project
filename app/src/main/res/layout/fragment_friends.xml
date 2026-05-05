@@ -5,23 +5,24 @@
     android:orientation="vertical"
     android:padding="16dp">
 
+    <!-- ── Friend Requests ── -->
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="@string/friend_requests"
         android:textSize="20sp"
         android:textStyle="bold"
-        android:layout_marginBottom="8dp" />
+        android:layout_marginBottom="4dp" />
 
-    <TextView
-        android:id="@+id/tv_requests"
+    <!-- Dynamic friend-request rows (populated in code) -->
+    <LinearLayout
+        android:id="@+id/ll_requests_container"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="No new requests"
-        android:layout_marginBottom="24dp"
-        android:textColor="@android:color/holo_blue_dark"
-        android:textSize="16sp" />
+        android:orientation="vertical"
+        android:layout_marginBottom="24dp" />
 
+    <!-- ── Add Friend ── -->
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
@@ -48,7 +49,8 @@
             android:layout_height="wrap_content"
             android:text="@string/send" />
     </LinearLayout>
-    
+
+    <!-- ── My Friends ── -->
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
@@ -56,26 +58,13 @@
         android:textSize="20sp"
         android:textStyle="bold"
         android:layout_marginTop="24dp"
-        android:layout_marginBottom="8dp" />
+        android:layout_marginBottom="4dp" />
 
-    <TextView
-        android:id="@+id/tv_friends_list"
+    <!-- Dynamic friend rows with avatars (populated in code) -->
+    <LinearLayout
+        android:id="@+id/ll_friends_container"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:textSize="16sp"
-        android:text="No friends yet" />
+        android:orientation="vertical" />
 
-    <View
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1" />
-
-    <Button
-        android:id="@+id/btn_logout"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="32dp"
-        android:text="@string/logout"
-        android:backgroundTint="#D32F2F"
-        android:textColor="@android:color/white" />
 </LinearLayout>
