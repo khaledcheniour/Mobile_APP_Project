@@ -104,6 +104,7 @@ public class MainActivity extends AppCompatActivity {
             if      (id == R.id.nav_map)     selected = new MapFragment();
             else if (id == R.id.nav_list)    selected = new ListFragment();
             else if (id == R.id.nav_friends) selected = new FriendsFragment();
+            else if (id == R.id.nav_places)  selected = new PlacesFragment();
             if (selected != null) {
                 getSupportFragmentManager()
                         .beginTransaction()

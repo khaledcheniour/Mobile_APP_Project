@@ -54,6 +54,11 @@
         <!-- Add Memory -->
         <activity android:name=".AddMemoryActivity" />
 
+        <!-- Story View -->
+        <activity
+            android:name=".StoryActivity"
+            android:theme="@style/Theme.AppCompat.NoActionBar" />
+
     </application>
 
 </manifest>

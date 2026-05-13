@@ -35,6 +35,7 @@ import java.util.UUID;
 public class AddMemoryActivity extends AppCompatActivity {
 
     private ImageView imgPreview;
+    private EditText etPlace;
     private EditText etNote;
     private Spinner spinnerEmotion;
     private MapView mapPicker;
@@ -61,6 +62,7 @@ public class AddMemoryActivity extends AppCompatActivity {
         setContentView(R.layout.activity_add_memory);
 
         imgPreview = findViewById(R.id.img_preview);
+        etPlace = findViewById(R.id.et_place);
         etNote = findViewById(R.id.et_note);
         spinnerEmotion = findViewById(R.id.spinner_emotion);
         mapPicker = findViewById(R.id.map_picker);
@@ -152,10 +154,16 @@ public class AddMemoryActivity extends AppCompatActivity {
             return;
         }
 
+        String place = etPlace.getText().toString().trim();
+        if (place.isEmpty()) {
+            Toast.makeText(this, "Please enter a place name", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
         String note = etNote.getText().toString();
         String emotion = spinnerEmotion.getSelectedItem().toString();
 
-        Memory memory = new Memory(selectedLocation.getLatitude(), selectedLocation.getLongitude(), note, emotion, currentImagePath);
+        Memory memory = new Memory(selectedLocation.getLatitude(), selectedLocation.getLongitude(), note, emotion, currentImagePath, place);
 
         android.content.SharedPreferences prefs = getSharedPreferences("MemoryAppPrefs", MODE_PRIVATE);
         String username = prefs.getString("current_user", "Guest");
